@@ -1,6 +1,11 @@
 data "google_project" "this" {}
 
-module sa-vault-server {
+locals {
+  _ver_split = split("/", google_secret_manager_secret_version.current.id)
+  config_ver = local._ver_split[length(local._ver_split) - 1]
+}
+
+module "sa-vault-server" {
   source = "./modules/serviceaccount"
 
   account_id  = "vault-server"
@@ -8,7 +13,7 @@ module sa-vault-server {
 }
 
 
-module gcs-vault-backend {
+module "gcs-vault-backend" {
   source = "./modules/storage"
 
   name     = "${data.google_project.this.project_id}-vault"
@@ -23,4 +28,67 @@ resource "google_secret_manager_secret" "vault-config" {
   replication {
     automatic = true
   }
+}
+
+resource "google_secret_manager_secret_version" "current" {
+  secret      = google_secret_manager_secret.vault-config.name
+  secret_data = file("vault-server.hcl")
+}
+
+resource "google_secret_manager_secret_iam_binding" "vault-server-config" {
+  members = [
+    module.sa-vault-server.member
+  ]
+  role      = "roles/secretmanager.secretAccessor"
+  secret_id = google_secret_manager_secret.vault-config.name
+}
+
+resource "google_kms_key_ring" "vault_server" {
+  name     = "vault-server"
+  location = "global"
+}
+
+resource "google_kms_crypto_key" "seal" {
+  key_ring = google_kms_key_ring.vault_server.id
+  name     = "seal"
+  purpose  = "ENCRYPT_DECRYPT"
+}
+
+resource "google_kms_crypto_key_iam_binding" "seal" {
+  crypto_key_id = google_kms_crypto_key.seal.id
+  members = [
+    module.sa-vault-server.member
+  ]
+  role = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+}
+
+module "vault-server" {
+  source  = "./modules/cloudrun"
+  image   = "australia-southeast1-docker.pkg.dev/tom-taylor-1/chr/vault:1.7.3"
+  command = ["/entrypoint"]
+  name    = "vault-server"
+  ingress = "all"
+  ports = [{
+    name           = null
+    container_port = "8200"
+  }]
+  envs = {
+    GOOGLE_PROJECT        = data.google_project.this.project_id
+    GOOGLE_STORAGE_BUCKET = module.gcs-vault-backend.name
+    SKIP_SETCAP           = true
+  }
+  secret_vols = {
+    vault-config = {
+      secret_name = google_secret_manager_secret.vault-config.secret_id
+      mount_path  = "/etc/vault/"
+      items = [{
+        key  = local.config_ver
+        path = "config.hcl"
+      }]
+    }
+  }
+  service_account_name = module.sa-vault-server.email
+  location             = var.region
+
+  depends_on = [google_secret_manager_secret_version.current]
 }

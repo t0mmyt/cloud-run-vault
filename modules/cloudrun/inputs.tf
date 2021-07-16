@@ -17,13 +17,23 @@ variable "ports" {
 
 variable "command" {
   type    = list(string)
-  default = null
+  default = []
 }
 
 variable "args" {
   type    = list(string)
-  default = null
+  default = []
 }
+
+//variable "cpuLim" {
+//  type = string
+//  default = null
+//}
+//
+//variable "memLim" {
+//  type = string
+//  default = null
+//}
 
 variable "service_account_name" {
   type    = string
@@ -33,6 +43,21 @@ variable "service_account_name" {
 variable "invokers" {
   type    = list(string)
   default = []
+}
+
+variable "envs" {
+  type    = map(string)
+  default = {}
+}
+
+variable "secret_envs" {
+  type    = map(object({ secretId : string, key : string }))
+  default = {}
+}
+
+variable "secret_vols" {
+  type    = map(object({ mount_path : string, secret_name : string, items : list(object({ key : string, path : string })) }))
+  default = {}
 }
 
 variable "ingress" {
