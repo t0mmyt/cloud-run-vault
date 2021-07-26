@@ -25,15 +25,25 @@ variable "args" {
   default = []
 }
 
-//variable "cpuLim" {
-//  type = string
-//  default = null
-//}
-//
-//variable "memLim" {
-//  type = string
-//  default = null
-//}
+variable "minInstances" {
+  type    = number
+  default = 0
+}
+
+variable "maxInstances" {
+  type    = number
+  default = null
+}
+
+variable "cpuLim" {
+  type    = string
+  default = null
+}
+
+variable "memLim" {
+  type    = string
+  default = null
+}
 
 variable "service_account_name" {
   type    = string
@@ -43,6 +53,11 @@ variable "service_account_name" {
 variable "invokers" {
   type    = list(string)
   default = []
+}
+
+variable "allowUnauthenticated" {
+  type    = bool
+  default = false
 }
 
 variable "envs" {

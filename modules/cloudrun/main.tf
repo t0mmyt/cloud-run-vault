@@ -1,7 +1,8 @@
 locals {
   annotations = {
     "run.googleapis.com/ingress"       = var.ingress
-    "autoscaling.knative.dev/minScale" = "1"
+    "autoscaling.knative.dev/minScale" = var.minInstances
+    "autoscaling.knative.dev/maxScale" = var.maxInstances
   }
 }
 
@@ -17,10 +18,11 @@ resource "google_cloud_run_service" "cr" {
         image   = var.image
         command = var.command
         args    = var.args
+
         resources {
           limits = {
-            cpu : "2000m"
-            memory : "2G"
+            cpu    = var.cpuLim
+            memory = var.memLim
           }
         }
 
@@ -47,6 +49,17 @@ resource "google_cloud_run_service" "cr" {
     annotations = local.annotations
   }
 }
+
+resource "google_cloud_run_service_iam_member" "noauth" {
+  count = var.allowUnauthenticated ? 1 : 0
+
+  location = var.location
+  service  = google_cloud_run_service.cr.name
+  member   = "allUsers"
+  role     = "roles/run.invoker"
+}
+
+
 
 resource "google_cloud_run_service_iam_member" "invokers" {
   for_each = toset(var.invokers)

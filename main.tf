@@ -62,8 +62,10 @@ resource "google_kms_crypto_key_iam_binding" "seal" {
   role = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
 }
 
-module "vault-server" {
-  source               = "./modules/cloudrun"
+module "cloudrun" {
+  source  = "app.terraform.io/tom-dev/cloudrun/google"
+  version = "0.0.2"
+  allowUnauthenticated = true
   image                = "australia-southeast1-docker.pkg.dev/tom-taylor-1/chr/vault:1.7.3"
   service_account_name = module.sa-vault-server.email
   location             = var.region
