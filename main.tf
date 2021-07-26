@@ -63,11 +63,12 @@ resource "google_kms_crypto_key_iam_binding" "seal" {
 }
 
 module "vault-server" {
-  source  = "./modules/cloudrun"
-  image   = "australia-southeast1-docker.pkg.dev/tom-taylor-1/chr/vault:1.7.3"
-  command = ["/entrypoint"]
-  name    = "vault-server"
-  ingress = "all"
+  source               = "./modules/cloudrun"
+  image                = "australia-southeast1-docker.pkg.dev/tom-taylor-1/chr/vault:1.7.3"
+  service_account_name = module.sa-vault-server.email
+  location             = var.region
+  name                 = "vault-server"
+  ingress              = "all"
   ports = [{
     name           = null
     container_port = "8200"
@@ -76,19 +77,9 @@ module "vault-server" {
     GOOGLE_PROJECT        = data.google_project.this.project_id
     GOOGLE_STORAGE_BUCKET = module.gcs-vault-backend.name
     SKIP_SETCAP           = true
+    VAULT_KEY_RING        = google_kms_key_ring.vault_server.name
+    VAULT_CRYPTO_KEY      = google_kms_crypto_key.seal.name
   }
-  secret_vols = {
-    vault-config = {
-      secret_name = google_secret_manager_secret.vault-config.secret_id
-      mount_path  = "/etc/vault/"
-      items = [{
-        key  = local.config_ver
-        path = "config.hcl"
-      }]
-    }
-  }
-  service_account_name = module.sa-vault-server.email
-  location             = var.region
 
   depends_on = [google_secret_manager_secret_version.current]
 }
