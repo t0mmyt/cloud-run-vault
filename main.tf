@@ -62,15 +62,41 @@ resource "google_kms_crypto_key_iam_binding" "seal" {
   role = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
 }
 
+module "sa-vault-gcp-auth" {
+  source = "./modules/serviceaccount"
+
+  account_id  = "vault-gcp-auth"
+  description = "SA for Vault GCP Auth"
+}
+
+resource "google_project_iam_custom_role" "vault-gcp-auth" {
+  role_id = "VaultGcpAuth"
+  title   = "Vault GCP Auth"
+  permissions = [
+    "iam.serviceAccounts.get",
+    "iam.serviceAccountKeys.get"
+  ]
+}
+
+resource "google_project_iam_binding" "vault-gcp-auth" {
+  members = [
+    module.sa-vault-server.member
+  ]
+  role = google_project_iam_custom_role.vault-gcp-auth.id
+}
+
 module "cloudrun" {
-  source  = "app.terraform.io/tom-dev/cloudrun/google"
-  version = "0.0.2"
+  source               = "app.terraform.io/tom-dev/cloudrun/google"
+  version              = "0.0.2"
+  maxInstances         = 1
   allowUnauthenticated = true
   image                = "australia-southeast1-docker.pkg.dev/tom-taylor-1/chr/vault:1.7.3"
   service_account_name = module.sa-vault-server.email
   location             = var.region
   name                 = "vault-server"
   ingress              = "all"
+  cpuLim               = "1000m"
+  memLim               = "512Mi"
   ports = [{
     name           = null
     container_port = "8200"
