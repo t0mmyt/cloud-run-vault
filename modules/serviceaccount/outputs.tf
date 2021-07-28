@@ -9,3 +9,7 @@ output "member" {
 output "email" {
   value = local.email
 }
+
+output "id" {
+  value = google_service_account.this.id
+}

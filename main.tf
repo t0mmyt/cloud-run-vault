@@ -107,7 +107,45 @@ module "cloudrun" {
     SKIP_SETCAP           = true
     VAULT_KEY_RING        = google_kms_key_ring.vault_server.name
     VAULT_CRYPTO_KEY      = google_kms_crypto_key.seal.name
+    VAULT_API_ADDR        = "https://vault-server-nis46fe7fa-ts.a.run.app"
   }
 
   depends_on = [google_secret_manager_secret_version.current]
+}
+
+module "sa-vault-demo" {
+  source = "./modules/serviceaccount"
+
+  account_id  = "vault-demo"
+  description = "SA for Vault GCP Auth Demo"
+}
+
+module "cr-vault-demo" {
+  source               = "app.terraform.io/tom-dev/cloudrun/google"
+  version              = "0.0.2"
+  maxInstances         = 1
+  allowUnauthenticated = false
+  image                = "australia-southeast1-docker.pkg.dev/tom-taylor-1/chr/vault-demo:0.1"
+  service_account_name = module.sa-vault-demo.email
+  location             = var.region
+  name                 = "vault-demo"
+  ingress              = "all"
+  cpuLim               = "1000m"
+  memLim               = "512Mi"
+//  envs = {
+//    GOOGLE_PROJECT        = data.google_project.this.project_id
+//    GOOGLE_STORAGE_BUCKET = module.gcs-vault-backend.name
+//    SKIP_SETCAP           = true
+//    VAULT_KEY_RING        = google_kms_key_ring.vault_server.name
+//    VAULT_CRYPTO_KEY      = google_kms_crypto_key.seal.name
+//  }
+  depends_on = [google_secret_manager_secret_version.current]
+}
+
+resource "google_service_account_iam_binding" "vault-signing" {
+  members = [
+    module.sa-vault-demo.member
+  ]
+  role = "roles/iam.serviceAccountTokenCreator"
+  service_account_id = module.sa-vault-demo.id
 }
